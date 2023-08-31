@@ -1,19 +1,17 @@
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, password_validation
+from django.db.models import Q
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 from .models import CustomUser
-from auth_system.services.email import ActivationEmail
-from auth_system.constants import Messages
-from auth_system.services.cache_functions import getKey, deleteKey, setKey
-import random
-from django.contrib.auth.password_validation import validate_password
-from django.core import exceptions as django_exceptions
+from auth_system.services import email, cache_functions as cache
+from django.core import exceptions
 from rest_framework.settings import api_settings
 
 User = get_user_model()
-error_messages = Messages()
 
 
-class CustomUserSerializer(serializers.ModelSerializer):
+class RegisterCustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'phone_or_email', 'full_name', 'password']
@@ -23,15 +21,9 @@ class CustomUserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         self.context['user'] = user
         if not user.is_phone:
-            ActivationEmail(self.context.get('request'), self.context).send([user.phone_or_email])
+            email.EmailActivation(self.context.get('request'), self.context).send([user.phone_or_email])
         else:
-            activation_code = random.randint(100000, 999999)
-            setKey(
-                key=self.context.get('user').phone_or_email,
-                value=activation_code,
-                timeout=None
-            )
-            print(activation_code)
+            email.phone_activation(self.context.get('user').phone_or_email)
         return user
 
 
@@ -40,9 +32,9 @@ class CheckActivationSerializer(serializers.Serializer):
     phone_or_email = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        if getKey(attrs.get('phone_or_email')) != attrs.get('activation_code'):
-            raise serializers.ValidationError({"invalid_code": error_messages.INVALID_ACTIVATE_CODE_ERROR})
-        deleteKey(attrs.get('phone_or_email'))
+        if cache.getKey(attrs.get('phone_or_email')) != attrs.get('activation_code'):
+            raise serializers.ValidationError({"invalid_code": "Invalid activate code for given user."})
+        cache.deleteKey(attrs.get('phone_or_email'))
         return attrs
 
 
@@ -53,18 +45,12 @@ class SendEmailResetSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         user = User.objects.get(phone_or_email=attrs.get('phone_or_email'))
         if not user:
-            raise serializers.ValidationError({"user": error_messages.EMAIL_NOT_FOUND})
+            raise serializers.ValidationError({"user": "User with given email does not exist."})
         self.context['user'] = user
         if not user.is_phone:
-            ActivationEmail(self.context.get('request'), self.context).send([user.phone_or_email])
+            email.EmailActivation(self.context.get('request'), self.context).send([user.phone_or_email])
         else:
-            activation_code = random.randint(100000, 999999)
-            setKey(
-                key=self.context.get('user').phone_or_email,
-                value=activation_code,
-                timeout=None
-            )
-            print(activation_code)
+            email.phone_activation(self.context.get('user').phone_or_email)
         return attrs
 
 
@@ -74,11 +60,26 @@ class PasswordResetConfirmSerializer(CheckActivationSerializer):
     def validate(self, attrs):
         try:
             user = User.objects.get(phone_or_email=attrs.get('phone_or_email'))
-            validate_password(attrs.get('new_password'), user)
-        except django_exceptions.ValidationError as e:
+            password_validation.validate_password(attrs.get('new_password'), user)
+        except exceptions.ValidationError as e:
             serializer_error = serializers.as_serializer_error(e)
             raise serializers.ValidationError(
                 {"password": serializer_error[api_settings.NON_FIELD_ERRORS_KEY]}
             )
 
         return super().validate(attrs)
+
+
+class UserLoginSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        username = attrs.get("username")
+        try:
+            user = CustomUser.objects.get(Q(username=username) | Q(phone_or_email=username))
+        except CustomUser.DoesNotExist:
+            user = None
+
+        if user:
+            attrs[self.username_field] = user.get_username()
+            return super().validate(attrs)
+        else:
+            raise serializers.ValidationError("User not found")

@@ -2,15 +2,15 @@ from rest_framework.generics import CreateAPIView, GenericAPIView
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from auth_system.models import CustomUser
-from auth_system.serializers import CustomUserSerializer, CheckActivationSerializer, PasswordResetConfirmSerializer, \
-    SendEmailResetSerializer
+from auth_system.serializers import RegisterCustomUserSerializer, CheckActivationSerializer, SendEmailResetSerializer, \
+    PasswordResetConfirmSerializer, UserLoginSerializer
 from rest_framework import status
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 from django.contrib.auth.hashers import make_password
 
 
 class CustomUserRegistrationView(CreateAPIView):
-    serializer_class = CustomUserSerializer
+    serializer_class = RegisterCustomUserSerializer
     parser_classes = (FormParser, MultiPartParser)
 
 
@@ -28,6 +28,7 @@ class ActivationUserGenericAPIView(GenericAPIView):
 
 
 class UserTokenObtainPairView(TokenObtainPairView):
+    serializer_class = UserLoginSerializer
     parser_classes = (FormParser, MultiPartParser)
 
 

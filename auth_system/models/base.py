@@ -1,14 +1,13 @@
 __all__ = ('BaseAbstractUser',)
 
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth.validators import UnicodeUsernameValidator
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, AbstractUser
+from django.contrib.auth import models, validators
 from django.db.models import CharField, BooleanField, DateTimeField
 from auth_system.models.manager import BaseManagerUser
 
 
-class BaseAbstractUser(AbstractBaseUser, PermissionsMixin):
-    username_validator = UnicodeUsernameValidator()
+class BaseAbstractUser(models.AbstractBaseUser, models.PermissionsMixin):
+    username_validator = validators.UnicodeUsernameValidator()
     full_name = CharField(_("full name"), max_length=150, blank=True)
     is_phone = BooleanField(_("is phone"), default=False)
     phone_or_email = CharField(_("phone or email"),

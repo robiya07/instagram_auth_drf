@@ -1,15 +1,12 @@
 __all__ = ('BaseManagerUser',)
 
-from django.apps import apps
-from django.contrib import auth
-from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import BaseUserManager
 import re
-from django.core.exceptions import ValidationError
-from django.core.validators import EmailValidator
+from django.apps import apps
+from django.contrib.auth import hashers, models, _get_backends, load_backend
+from django.core import exceptions, validators
 
 
-class BaseManagerUser(BaseUserManager):
+class BaseManagerUser(models.BaseUserManager):
     use_in_migrations = True
 
     def _create_user(self, username, phone_or_email, password, **extra_fields):
@@ -17,7 +14,7 @@ class BaseManagerUser(BaseUserManager):
             self.model._meta.app_label, self.model._meta.object_name
         )
 
-        email_validator = EmailValidator()
+        email_validator = validators.EmailValidator()
 
         if not phone_or_email:
             raise ValueError("The given phone or email must be set")
@@ -25,7 +22,7 @@ class BaseManagerUser(BaseUserManager):
             try:
                 email_validator(phone_or_email)
                 is_phone = False
-            except ValidationError:
+            except exceptions.ValidationError:
                 pattern = r'^\+?[0-9]+(?:[-\s][0-9]+)*$'
                 if re.match(pattern, phone_or_email):
                     is_phone = True
@@ -34,7 +31,7 @@ class BaseManagerUser(BaseUserManager):
 
         username = GlobalUserModel.normalize_username(username)
         user = self.model(username=username, is_phone=is_phone, phone_or_email=phone_or_email, **extra_fields)
-        user.password = make_password(password)
+        user.password = hashers.make_password(password)
         user.save(using=self._db)
         return user
 
@@ -67,7 +64,7 @@ class BaseManagerUser(BaseUserManager):
             self, perm, is_active=True, include_superusers=True, backend=None, obj=None
     ):
         if backend is None:
-            backends = auth._get_backends(return_tuples=True)
+            backends = _get_backends(return_tuples=True)
             if len(backends) == 1:
                 backend, _ = backends[0]
             else:
@@ -80,7 +77,7 @@ class BaseManagerUser(BaseUserManager):
                 "backend must be a dotted import path string (got %r)." % backend
             )
         else:
-            backend = auth.load_backend(backend)
+            backend = load_backend(backend)
         if hasattr(backend, "with_perm"):
             return backend.with_perm(
                 perm,
