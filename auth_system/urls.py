@@ -1,15 +1,20 @@
 from django.urls import path
-from auth_system.views import CustomUserRegistrationView, ActivationUserGenericAPIView, UserTokenObtainPairView, \
-    UserTokenRefreshView, UserTokenVerifyView, PasswordResetGenericAPIView, PasswordResetConfirmUpdateAPIView
+from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
+from auth_system.views import (UserRegistrationView, UserTokenObtainPairView,
+                               VerifyGenericAPIView, PasswordResetConfirmUpdateAPIView, PasswordResetGenericAPIView,
+                               PasswordChangeGenericAPIView)
 
 app_name = 'auth_system'
 
 urlpatterns = [
-    path('register/', CustomUserRegistrationView.as_view(), name='register'),
-    path('register/activated-account/', ActivationUserGenericAPIView.as_view(), name='activated_account'),
-    path('token/create/', UserTokenObtainPairView.as_view(), name='token_create'),
-    path('token/refresh/', UserTokenRefreshView.as_view(), name='token_refresh'),
-    path('token/verify/', UserTokenVerifyView.as_view(), name='token_verify'),
-    path('reset-password/', PasswordResetGenericAPIView.as_view(), name='reset_password'),
-    path('reset-password/confirm/', PasswordResetConfirmUpdateAPIView.as_view(), name='reset_password_confirm'),
+    path('register/', UserRegistrationView.as_view(), name='register'),
+    path('register/verify/', VerifyGenericAPIView.as_view(), name='verify'),
+
+    path('login/', UserTokenObtainPairView.as_view(), name='login'),
+    path('login/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('login/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+
+    path('password_reset/', PasswordResetGenericAPIView.as_view(), name='password_reset'),
+    path('password_reset/confirm/', PasswordResetConfirmUpdateAPIView.as_view(), name='password_reset_confirm'),
+    path('password_change/', PasswordChangeGenericAPIView.as_view(), name='password_change'),
 ]
